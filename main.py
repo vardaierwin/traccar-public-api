@@ -17,12 +17,15 @@ class Location(BaseModel):
 
 @app.post("/locations")
 async def receive_location(loc: Location):
+    # Csak Neon DB-be mentés
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
+        # Ha speed nincs megadva, NULL-t használunk
+        speed_value = loc.speed if loc.speed is not None else None
         cur.execute(
             "INSERT INTO locations (device_id, latitude, longitude, timestamp, speed) VALUES (%s, %s, %s, %s, %s)",
-            (loc.device_id, loc.latitude, loc.longitude, loc.timestamp, loc.speed)
+            (loc.device_id, loc.latitude, loc.longitude, loc.timestamp, speed_value)
         )
         conn.commit()
         cur.close()
