@@ -2,6 +2,8 @@ from fastapi import FastAPI, Request
 import logging
 import os
 from sqlalchemy import create_engine, text
+from datetime import datetime
+import pytz
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,34 +22,41 @@ async def save_location(request: Request):
         logger.info(f"JSON body: {data}")
 
         # Mezők kiszedése
+        user_id = data.get("user", "unknown")
+        device_id = data.get("device", "unknown")
         lat = data.get("lat")
         lon = data.get("lon")
-        tst = data.get("tst")   # timestamp
+        tst_raw = data.get("tst")  # Unix timestamp (UTC)
         batt = data.get("batt")
         acc = data.get("acc")
         alt = data.get("alt")
+        speed = data.get("vel")
+
+        # Idő konvertálása UTC → Europe/Bucharest
+        utc_dt = datetime.utcfromtimestamp(tst_raw)
+        local_tz = pytz.timezone("Europe/Bucharest")
+        tst_local = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz)
 
         # DB insert
         with engine.connect() as conn:
             conn.execute(
                 text("""
                     INSERT INTO locations (
-                        user_id, device_id, tracker_id, lat, lon, tst, batt, acc, alt, speed
+                        user_id, device_id, lat, lon, tst, batt, acc, alt, speed
                     ) VALUES (
-                        :user_id, :device_id, :tracker_id, :lat, :lon, to_timestamp(:tst), :batt, :acc, :alt, :speed
+                        :user_id, :device_id, :lat, :lon, :tst, :batt, :acc, :alt, :speed
                     )
                 """),
                 {
-                    "user_id": data.get("user", "unknown"),
-                    "device_id": data.get("device", "unknown"),
-                    "tracker_id": data.get("tid"),
-                    "lat": data.get("lat"),
-                    "lon": data.get("lon"),
-                    "tst": data.get("tst"),
-                    "batt": data.get("batt"),
-                    "acc": data.get("acc"),
-                    "alt": data.get("alt"),
-                    "speed": data.get("vel")  # ha van velocity mező
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "lat": lat,
+                    "lon": lon,
+                    "tst": tst_local,
+                    "batt": batt,
+                    "acc": acc,
+                    "alt": alt,
+                    "speed": speed
                 }
             )
             conn.commit()
