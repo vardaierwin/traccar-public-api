@@ -22,8 +22,8 @@ async def save_location(request: Request):
         logger.info(f"JSON body: {data}")
 
         # Mezők kiszedése
-        user_id = data.get("user", "unknown")
-        device_id = data.get("device", "unknown")
+        user_id = data.get("tid", "unknown")
+        device_id = data.get("_type", "unknown")
         lat = data.get("lat")
         lon = data.get("lon")
         tst_raw = data.get("tst")  # Unix timestamp (UTC)
@@ -35,7 +35,7 @@ async def save_location(request: Request):
         # Idő konvertálása UTC → Europe/Bucharest
         utc_dt = datetime.utcfromtimestamp(tst_raw)
         local_tz = pytz.timezone("Europe/Bucharest")
-        tst_local = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz)
+        tst_local = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz).replace(tzinfo=None)
 
         # DB insert
         with engine.connect() as conn:
