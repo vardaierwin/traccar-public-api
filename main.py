@@ -31,10 +31,24 @@ async def save_location(request: Request):
         with engine.connect() as conn:
             conn.execute(
                 text("""
-                    INSERT INTO locations (lat, lon, tst, batt, acc, alt)
-                    VALUES (:lat, :lon, to_timestamp(:tst), :batt, :acc, :alt)
+                    INSERT INTO locations (
+                        user_id, device_id, tracker_id, lat, lon, tst, batt, acc, alt, speed
+                    ) VALUES (
+                        :user_id, :device_id, :tracker_id, :lat, :lon, to_timestamp(:tst), :batt, :acc, :alt, :speed
+                    )
                 """),
-                {"lat": lat, "lon": lon, "tst": tst, "batt": batt, "acc": acc, "alt": alt}
+                {
+                    "user_id": data.get("user", "unknown"),
+                    "device_id": data.get("device", "unknown"),
+                    "tracker_id": data.get("tid"),
+                    "lat": data.get("lat"),
+                    "lon": data.get("lon"),
+                    "tst": data.get("tst"),
+                    "batt": data.get("batt"),
+                    "acc": data.get("acc"),
+                    "alt": data.get("alt"),
+                    "speed": data.get("vel")  # ha van velocity mező
+                }
             )
             conn.commit()
 
