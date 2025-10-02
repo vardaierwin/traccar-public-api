@@ -1,40 +1,48 @@
 from fastapi import FastAPI, Request
 import logging
 import os
+from sqlalchemy import create_engine, text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-DATABASE_URL = os.getenv("DATABASE_URL")  # Ezt később a DB-hez használjuk
 
-@app.api_route("/locations", methods=["GET", "POST", "PUT"])
-@app.api_route("/", methods=["GET", "POST", "PUT"])
-async def catch_all(request: Request):
-    """Catch all requests to see what Traccar actually sends"""
+# DB kapcsolat (Render / Neon PostgreSQL)
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
-    # Log request method, URL és query params
-    logger.info(f"Method: {request.method}")
-    logger.info(f"URL: {request.url}")
-    logger.info(f"Headers: {dict(request.headers)}")
-    logger.info(f"Query params: {dict(request.query_params)}")
-
-    # Log body, ha van
+@app.post("/locations")
+async def save_location(request: Request):
+    """Fogadja az OwnTracks JSON-t és DB-be menti"""
     try:
-        body_bytes = await request.body()
-        if body_bytes:
-            # Próbáljuk dekódolni UTF-8-ként
-            try:
-                body_text = body_bytes.decode("utf-8")
-                logger.info(f"Body: {body_text}")
-            except UnicodeDecodeError:
-                logger.info(f"Body (raw bytes): {body_bytes}")
-        else:
-            logger.info("No body sent")
-    except Exception as e:
-        logger.error(f"Error reading body: {e}")
+        data = await request.json()
+        logger.info(f"JSON body: {data}")
 
-    return "OK"
+        # Mezők kiszedése
+        lat = data.get("lat")
+        lon = data.get("lon")
+        tst = data.get("tst")   # timestamp
+        batt = data.get("batt")
+        acc = data.get("acc")
+        alt = data.get("alt")
+
+        # DB insert
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO locations (lat, lon, tst, batt, acc, alt)
+                    VALUES (:lat, :lon, to_timestamp(:tst), :batt, :acc, :alt)
+                """),
+                {"lat": lat, "lon": lon, "tst": tst, "batt": batt, "acc": acc, "alt": alt}
+            )
+            conn.commit()
+
+        return {"status": "ok", "message": "Location saved"}
+
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/ping")
 def ping():
