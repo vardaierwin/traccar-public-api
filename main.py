@@ -22,21 +22,28 @@ async def save_location(request: Request):
         logger.info(f"JSON body: {data}")
 
         # Mezők kiszedése
-        user_id = data.get("tid", "unknown")
-        device_id = data.get("_type", "unknown")
+        topic = data.get("topic", "")
+        user_id, device_id = "unknown", "unknown"
+        parts = topic.split("/")
+        if len(parts) >= 3:
+            user_id = parts[1]
+            device_id = parts[2]
+
         lat = data.get("lat")
         lon = data.get("lon")
-        tst_raw = data.get("tst")  # Unix timestamp (UTC)
+        tst = data.get("tst")
         batt = data.get("batt")
         acc = data.get("acc")
         alt = data.get("alt")
         speed = data.get("vel")
 
         # Idő konvertálása UTC → Europe/Bucharest
-        utc_dt = datetime.utcfromtimestamp(tst_raw)
-        local_tz = pytz.timezone("Europe/Bucharest")
-        tst_local = utc_dt.replace(tzinfo=pytz.utc).astimezone(local_tz).replace(tzinfo=None)
-
+        if tst:
+            utc_dt = datetime.utcfromtimestamp(tst).replace(tzinfo=pytz.utc)
+            local_tz = pytz.timezone("Europe/Bucharest")
+            tst_local = utc_dt.astimezone(local_tz).replace(tzinfo=None)
+        else:
+            tst_local = None
         # DB insert
         with engine.connect() as conn:
             conn.execute(
